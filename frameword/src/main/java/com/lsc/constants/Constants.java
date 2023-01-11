@@ -20,7 +20,10 @@ public class Constants {
     public static final String LINK_STATUS_NORMAL = "0";
 
     //用户redis的key
-    public static final String USER_REIDS_KEY = "bloglogin:";
+    public static final String USER_REDIS_KEY = "userlogin:";
+
+    //管理员redis的key
+    public static final String ADMIN_REDIS_KEY = "adminlogin:";
 
     //根评论
     public static final String ROOT_COMMENT = "-1";

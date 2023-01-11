@@ -1,6 +1,10 @@
 package com.lsc.config;
 
+import com.alibaba.fastjson.serializer.SerializeConfig;
+import com.alibaba.fastjson.serializer.ToStringSerializer;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.converter.HttpMessageConverter;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
@@ -22,4 +26,5 @@ public class CorsConfig implements WebMvcConfigurer {
                 // 跨域允许时间，就是这些时间里只要验证一次
                 .maxAge(3600);
     }
+
 }

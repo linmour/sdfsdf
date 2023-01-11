@@ -16,4 +16,15 @@ public interface LinkService extends IService<Link> {
 
     Result getAllLink();
 
+    Result listL(Integer pageNum, Integer pageSize, String name, String status);
+
+    Result add(Link link);
+
+    Result getByIdL(Long id);
+
+    Result updateL(Link link);
+
+    Result del(Long id);
+
+    Result changeLinkStatus(Link link);
 }

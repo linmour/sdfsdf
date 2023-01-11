@@ -2,22 +2,36 @@ package com.lsc.service.impl;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.lsc.domain.Result;
+import com.lsc.domain.entity.Category;
+import com.lsc.domain.entity.Role;
 import com.lsc.domain.entity.User;
+import com.lsc.domain.entity.UserRole;
+import com.lsc.domain.vo.PageVo;
+import com.lsc.domain.vo.UserCVo;
 import com.lsc.domain.vo.UserInfoVo;
+import com.lsc.domain.vo.UserVo;
 import com.lsc.enums.AppHttpCodeEnum;
 import com.lsc.exception.SystemException;
 import com.lsc.mapper.UserMapper;
+import com.lsc.service.RoleService;
+import com.lsc.service.UserRoleService;
 import com.lsc.service.UserService;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.lsc.utils.BeanCopyUtils;
 import kotlin.jvm.internal.Lambda;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
 import javax.annotation.Resource;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static com.lsc.utils.SecurityUtils.getUserId;
 
@@ -34,6 +48,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
 
     @Resource
     private BCryptPasswordEncoder bCryptPasswordEncoder;
+
+    @Resource
+    private UserRoleService userRoleService;
+
+    @Resource
+    private RoleService roleService;
+
+
     @Override
     public Result userInfo() {
         User user = getById(getUserId());
@@ -82,6 +104,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         return Result.okResult();
     }
 
+    @Override
+    public Result listL(Integer pageNum, Integer pageSize, String userName, String phonenumber, String status) {
+        LambdaQueryWrapper<User> userLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        userLambdaQueryWrapper.eq(StringUtils.hasText(phonenumber),User::getPhonenumber,phonenumber)
+                .like(StringUtils.hasText(userName),User::getUserName,userName)
+                .like(StringUtils.hasText(status),User::getStatus,status);
+        Page<User> page = new Page<>(pageNum,pageSize);
+        page(page,userLambdaQueryWrapper);
+        List<UserVo> userVos = BeanCopyUtils.copyBeanList(page.getRecords(), UserVo.class);
+        return Result.okResult(new PageVo(userVos,page.getTotal()));
+
+    }
+
     private boolean userNameExist(String userName){
         LambdaQueryWrapper<User> userLambdaQueryWrapper = new LambdaQueryWrapper<>();
         userLambdaQueryWrapper.eq(User::getUserName,userName);
@@ -92,5 +127,53 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         LambdaQueryWrapper<User> userLambdaQueryWrapper = new LambdaQueryWrapper<>();
         userLambdaQueryWrapper.eq(User::getNickName,nickName);
         return count(userLambdaQueryWrapper)>0;
+    }
+
+    @Override
+    public Result delById(Long id) {
+
+        LambdaUpdateWrapper<User> categoryLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        categoryLambdaUpdateWrapper.eq(User::getId,id)
+                .set(User::getDelFlag,1);
+        boolean update = update(categoryLambdaUpdateWrapper);
+        if (update)
+            return Result.okResult();
+        return Result.errorResult(AppHttpCodeEnum.ERROR);
+    }
+
+    @Override
+    public Result getByIdL(Long id) {
+        User user = getById(id);
+        UserVo userVo = BeanCopyUtils.copyBean(user, UserVo.class);
+
+        LambdaQueryWrapper<UserRole> userRoleLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        userRoleLambdaQueryWrapper.eq(UserRole::getUserId,id);
+        List<UserRole> list = userRoleService.list(userRoleLambdaQueryWrapper);
+        List<Long> collect = list.stream()
+                .map(userRole -> userRole.getRoleId())
+                .collect(Collectors.toList());
+            List<Role> roles = roleService.list();
+
+        return Result.okResult(new UserCVo(collect,roles,userVo));
+
+
+    }
+
+    @Override
+    @Transactional
+    public Result updateL(User user) {
+
+        updateById(user);
+
+        List<UserRole> collect = user.getRoleIds().stream()
+                .map(a -> new UserRole(user.getId(), a))
+                .collect(Collectors.toList());
+        LambdaQueryWrapper<UserRole> userRoleLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        userRoleLambdaQueryWrapper.eq(UserRole::getUserId,user.getId());
+        if(userRoleService.remove(userRoleLambdaQueryWrapper))
+            return Result.errorResult(AppHttpCodeEnum.ERROR);
+        if(userRoleService.saveBatch(collect))
+            return Result.okResult();
+        return Result.errorResult(AppHttpCodeEnum.ERROR);
     }
 }

@@ -21,7 +21,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Objects;
 
-import static com.lsc.constants.Constants.USER_REIDS_KEY;
+import static com.lsc.constants.Constants.USER_REDIS_KEY;
+import static com.lsc.constants.Constants.USER_REDIS_KEY;
 
 /**
  * @Classname JwtAuthenticationTokenFilter
@@ -55,7 +56,7 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             return;
         }
         //从redis中获取数据
-        LoginUser user = redisCache.getCacheObject(USER_REIDS_KEY+id);
+        LoginUser user = redisCache.getCacheObject(USER_REDIS_KEY+id);
         if (Objects.isNull(user)){
             Result result = Result.errorResult(AppHttpCodeEnum.NEED_LOGIN);
             WebUtils.renderString(response, JSON.toJSONString(result));

@@ -1,21 +1,28 @@
 package com.lsc.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.lsc.domain.Result;
+import com.lsc.domain.dto.ArticleAddDto;
 import com.lsc.domain.entity.Article;
+import com.lsc.domain.entity.ArticleTag;
 import com.lsc.domain.entity.Category;
-import com.lsc.domain.vo.ArticleDetailVo;
-import com.lsc.domain.vo.ArticleListVo;
-import com.lsc.domain.vo.HotArticleVo;
-import com.lsc.domain.vo.PageVo;
+import com.lsc.domain.vo.*;
+import com.lsc.enums.AppHttpCodeEnum;
 import com.lsc.mapper.ArticleMapper;
+import com.lsc.mapper.ArticleTagMapper;
 import com.lsc.service.ArticleService;
+import com.lsc.service.ArticleTagService;
 import com.lsc.service.CategoryService;
 import com.lsc.utils.BeanCopyUtils;
 import com.lsc.utils.RedisCache;
+import com.lsc.utils.SecurityUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -73,6 +80,18 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
 
     @Resource
     private RedisCache redisCache;
+
+    @Resource
+    private ArticleService articleService;
+
+    @Resource
+    private ArticleTagService articleTagService;
+
+    @Resource
+    private ArticleTagMapper articleTagMapper;
+
+
+
 
     @Override
     public Result ArticleList(Integer pageNum, Integer pageSize, Long categoryId) {
@@ -147,5 +166,90 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, Article> impl
     public Result updateViewCount(String id) {
         redisCache.incrementCacheMapValue(ARTICLE_VIEWCOUNT_KEY,id,1);
         return Result.okResult();
+    }
+
+    @Override
+    @Transactional
+    public Result saveOrUpdateL(ArticleAddDto articleAddDto) {
+
+        Article article = BeanCopyUtils.copyBean(articleAddDto, Article.class);
+        //这样的很关键，就是他插入之后会自动把id赋值给article里，我们下面就可以直接使用
+        save(article);
+
+
+//        DateTimeFormatter aFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+//        LocalDateTime localDateTime = article.getCreateTime();
+//        String foramttedString = localDateTime.format(aFormatter);
+//        LambdaUpdateWrapper<Article> articleLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+//        articleLambdaUpdateWrapper.eq(Article::getCreateTime,foramttedString)
+//                .eq(Article::getCreateBy,article.getCreateBy());
+
+
+        List<ArticleTag> articleTags = articleAddDto.getTags().stream()
+                //这一步是把tag数组，里面就是标签的id，然后把每一个id，变成一个ArticleTag对象进行赋值
+                .map(tagId -> new ArticleTag(article.getId(), tagId))
+                .collect(Collectors.toList());
+
+        //添加 博客和标签的关联
+        boolean b = articleTagService.saveBatch(articleTags);
+        if(b)
+            return Result.okResult();
+
+        return Result.errorResult(AppHttpCodeEnum.ERROR);
+    }
+
+    @Override
+    public Result listL(Integer pageNum, Integer pageSize, @RequestParam(value = "title",required = false) String title,@RequestParam(value = "summary",required = false) String summary) {
+        LambdaQueryWrapper<Article> articleLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        articleLambdaQueryWrapper.like(StringUtils.hasText(title),Article::getTitle,title)
+                .like(StringUtils.hasText(summary),Article::getSummary,summary)
+                .eq(Article::getDelFlag,0);
+        Page<Article> page = new Page<>(pageNum,pageSize);
+        Page<Article> articlePage = page(page, articleLambdaQueryWrapper);
+        List<ArticleVo> articleVos = BeanCopyUtils.copyBeanList(articlePage.getRecords(), ArticleVo.class);
+        return Result.okResult(new PageVo(articleVos,articlePage.getTotal()));
+    }
+
+    @Override
+    public Result getArticleById(Long id) {
+        Article article = articleService.getById(id);
+        LambdaQueryWrapper<ArticleTag> articleTagLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        articleTagLambdaQueryWrapper.eq(ArticleTag::getArticleId,id);
+        List<ArticleTag> articleTags = articleTagMapper.selectList(articleTagLambdaQueryWrapper);
+        List<Long> tagsId = articleTags.stream()
+                .map(articleTag -> articleTag.getTagId())
+                .collect(Collectors.toList());
+        article.setTags(tagsId);
+        return Result.okResult(article);
+    }
+
+    @Override
+    @Transactional
+    public Result updateL(Article article) {
+        article.setUpdateBy(SecurityUtils.getUserId());
+        boolean b = articleService.updateById(article);
+
+        LambdaQueryWrapper<ArticleTag> articleTagLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        articleTagLambdaQueryWrapper.eq(ArticleTag::getArticleId,article.getId());
+        int delete = articleTagMapper.delete(articleTagLambdaQueryWrapper);
+        List<ArticleTag> collect = article.getTags().stream()
+                .map(tag -> new ArticleTag(article.getId(), tag))
+                .collect(Collectors.toList());
+        articleTagService.saveBatch(collect);
+        if (b && delete>0){
+            return Result.okResult();
+        }
+        return Result.errorResult(AppHttpCodeEnum.ERROR);
+    }
+
+    @Override
+    public Result delById(Long id) {
+        LambdaUpdateWrapper<Article> articleLambdaUpdateWrapper = new LambdaUpdateWrapper<>();
+        articleLambdaUpdateWrapper.eq(Article::getId,id)
+                        .set(Article::getDelFlag,1);
+        boolean update = articleService.update(articleLambdaUpdateWrapper);
+        if (update)
+            return Result.okResult();
+        return Result.errorResult(AppHttpCodeEnum.ERROR);
     }
 }

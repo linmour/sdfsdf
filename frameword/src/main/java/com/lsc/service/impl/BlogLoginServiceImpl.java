@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 
-import static com.lsc.constants.Constants.USER_REIDS_KEY;
+import static com.lsc.constants.Constants.USER_REDIS_KEY;
 
 /**
  * <p>
@@ -54,7 +54,7 @@ public class BlogLoginServiceImpl extends ServiceImpl<BlogLoginMapper, User> imp
         //用id生成jwt
         String jwt = JwtUtil.createJWT(UserId);
         //把用户信息存入redis
-        redisCache.setCacheObject(USER_REIDS_KEY+UserId,loginUser);
+        redisCache.setCacheObject(USER_REDIS_KEY+UserId,loginUser);
 
         //把用户信息封装成vo
         UserInfoVo userInfoVo = BeanCopyUtils.copyBean(loginUser.getUser(), UserInfoVo.class);
@@ -70,7 +70,7 @@ public class BlogLoginServiceImpl extends ServiceImpl<BlogLoginMapper, User> imp
         //获取用户id
         Long id = user.getUser().getId();
 
-        redisCache.deleteObject(USER_REIDS_KEY+id);
+        redisCache.deleteObject(USER_REDIS_KEY+id);
         return Result.okResult();
 
     }

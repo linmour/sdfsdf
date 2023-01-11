@@ -1,10 +1,13 @@
 package com.lsc.domain.entity;
 
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import java.time.LocalDateTime;
 import java.io.Serializable;
+import java.util.List;
+
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
 import lombok.Data;
@@ -72,5 +75,7 @@ public class User implements Serializable {
     @ApiModelProperty(value = "删除标志（0代表未删除，1代表已删除）")
     private Integer delFlag;
 
+    @TableField(exist = false)
+    List<Long> roleIds;
 
 }

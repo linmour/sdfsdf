@@ -3,6 +3,7 @@ package com.lsc.service;
 import com.lsc.domain.Result;
 import com.lsc.domain.entity.Article;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.lsc.domain.dto.ArticleAddDto;
 
 /**
  * <p>
@@ -22,4 +23,13 @@ public interface ArticleService extends IService<Article> {
 
     Result updateViewCount(String id);
 
+    Result saveOrUpdateL(ArticleAddDto articleAddDto);
+
+    Result listL(Integer pageNum, Integer pageSize, String title, String summary);
+
+    Result getArticleById(Long id);
+
+    Result updateL(Article article);
+
+    Result delById(Long id);
 }
